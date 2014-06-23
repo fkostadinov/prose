@@ -19,6 +19,8 @@ var upload = require('../upload');
 var cookie = require('../cookie');
 var templates = require('../../dist/templates');
 
+var jsonform = require('jsonform');
+
 module.exports = Backbone.View.extend({
   id: 'post',
 
@@ -303,8 +305,185 @@ module.exports = Backbone.View.extend({
 
     return content;
   },
-
-  initEditor: function() {
+  
+  jsonFormFormatObj: {
+	
+	"schema":
+	{
+	  "name_de":
+      {
+		"type": "string",
+		"title": "Name Deutsch",
+		"required": true
+      },
+	  "specification":
+	  {
+	    "type": "string",
+		"title": "Spezifikation"
+	  },
+	  "synonyms":
+	  {
+	    "type": "string",
+		"title": "Synonyme"
+	  },
+	  "name_en":
+	  {
+	    "type": "string",
+		"title": "Name Englisch"
+	  },
+	  "name_fr":
+	  {
+	    "type": "string",
+		"title": "Name Franz."
+	  },
+	  "kg_co2_eq_per_kg": {
+	    "type": "number",
+		"title": "kg CO2-Aeq./kg"
+	  },
+	  "id":
+	  {
+	    "type": "string",
+		"title": "ID"
+	  },
+	  "tags":
+	  {
+	    "type": "string",
+		"title": "Tags",
+		"required": true
+	  },
+	  "isCombinedProduct":
+	  {
+	    "type": "boolean",
+		"title": "Kombiniertes Produkt"
+	  },
+	  "production":
+	  {
+	    "type": "string",
+		"title": "Herstellung",
+		"enum": ["konventionell", "GH", "Bio"]
+	  },
+	  "background_info": 
+	  {
+	    "type": "string",
+		"title": "Background Info"
+	  },
+	  "co2_calculation":
+	  {
+	    "type": "textarea",
+		"title": "CO2 Berechnung"
+	  }
+	},
+	  
+	"value": {},
+	  
+	//// Important: We must re-bind this function to the owner of updateFile before calling it
+	//"onSubmit": function(errors, values) {
+	//  if (errors) {
+	//   // Error handling...
+	//    alert("onSubmit: Error!");
+	//  }
+	//  else {
+	//	self.updateFile();
+	//  }
+	//},
+	
+	// Important: We must re-bind this function to the owner of updateFile before calling it
+	"onSubmitValid": function(values) {
+	  this.updateFile();
+    }
+  },
+  
+  initEdbEditor: function() {
+    var self = this;
+	var contentStr = this.model.get('content') || '';
+	
+	// Replace all line breaks and carriage returns in json input to blanks
+	var content = contentStr.replace(/(\n|\r)/g, " ");
+	var contentObj = $.parseJSON(content);
+	
+	// Only append if tag does not exist yet
+	if ($('#jsonform').length <= 0) {
+	
+      // Important: The jsonform output must be inside a <form> tag, otherwise
+	  // the onSubmit/onSubmitValid Javascript code will not work.
+	  $('#edit').append('<form id="jsonform"></form>');
+	  
+      // Inject the value attribute obtained from the edb file
+	  this.jsonFormFormatObj.value = contentObj;
+	  this.jsonFormFormatObj.onSubmitValid = this.jsonFormFormatObj.onSubmitValid.bind(self);
+	  //this.jsonFormFormatObj.onSubmit = this.jsonFormFormatObj.onSubmit.bind(self);
+	  
+      // Here we need to reference self.jsonFormFormatObj instead of this.jsonFormFormatObj
+	  $('#jsonform').jsonForm(self.jsonFormFormatObj);  
+	}
+  },
+  
+  /*
+  initEdbEditor: function() {
+      // Remember a reference to this
+      var self = this;
+  
+	  // Get the JSON raw data
+	  var contentStr = this.model.get('content') || '{"schema": {}}';
+	  
+	  // JSON fails when parsing newline characters. Thus, replace
+	  // all newline and carriage return characters with spaces.
+	  var content = contentStr.replace(/(\n|\r)/g, " ");
+	  
+	  //alert(content);
+	  
+	  // TODO 1: Does input field validation work?
+	  
+	  var formIdStr = 'jsonform';
+	  
+	  // Only append if tag does not exist yet
+	  if ($('#' + formIdStr).length <= 0) {
+	  
+	  	// Important: The jsonform output must be inside a <form> tag, otherwise
+	    // the onSubmit/onSubmitValid Javascript code will not work.
+	    $('#edit').append('<form id="' + formIdStr + '"></form>');
+		
+		// Parse the content to a json object
+		var jsonObj = JSON.parse(
+		    content,
+		  
+		    // Revive function. This function is executed for each top-level JSON key/value
+		    // pair. We use this function to circumvent the problem that JSONForm expects
+		    // the onSubmit/onSubmitValid attributes to point to a valid Javascript function,
+		    // which is called when the Submit button is clicked.
+		    function(key, value) {
+			
+		      if (key === 'onSubmitValid') {
+			    var onSubmitValidFn = function(values) {
+			      this.updateFile();
+			    };
+			    // We need to bind the new function to the reference stored in self
+			    return onSubmitValidFn.bind(self);
+			  }
+			  
+			  if (key === 'onSubmit') {
+			    var onSubmitFn = function(errors, values) {
+			      if (errors) {
+	                // TODO: Some meaningful error action...
+				    alert("TODO: Invalid form input!");
+				  } else {
+				    this.updateFile();
+				  }
+		        };
+			    // We need to bind the new function to the reference stored in self
+			    return onSubmitFn.bind(self);
+			  }
+			
+			  // For all json attributes other than onSubmit/onSubmitValid, simply
+			  // return the value string specified in the EDB file.
+			  return value;
+		    }
+		  );
+	    $('#' + formIdStr).jsonForm(jsonObj);
+      }
+  },
+  */
+  initBaseEditor: function() {
     var lang = this.model.get('lang');
 
     // TODO: set default content for CodeMirror
@@ -351,6 +530,17 @@ module.exports = Backbone.View.extend({
     this.stashApply();
   },
 
+  initEditor: function() {
+ 	if (this.model.get('edb')) {
+	  // Editor for EDB files
+	  this.initEdbEditor();
+	}
+	else {
+	  // Editor for everything else than EDB files (e.g. markdown, html, plain text...)
+	  this.initBaseEditor();
+	}
+ },
+
   keyMap: function() {
     var self = this;
 
@@ -373,6 +563,7 @@ module.exports = Backbone.View.extend({
         }
       };
     } else {
+	  // Also applies for EDB files
       return {
         'Ctrl-S': function(codemirror) {
           self.updateFile();
@@ -389,7 +580,7 @@ module.exports = Backbone.View.extend({
     this.$el.find('.toolbar .group a').removeClass('on');
     this.$el.find('#dialog').empty().removeClass();
   },
-
+  
   initToolbar: function() {
     this.toolbar = new ToolbarView({
       view: this,
@@ -506,7 +697,8 @@ module.exports = Backbone.View.extend({
       var content = this.model.get('content');
 
       var file = {
-        markdown: this.model.get('markdown')
+        markdown: this.model.get('markdown'),
+		edb: this.model.get('edb')
       };
 
       this.$el.empty().append(_.template(this.template, file, {
@@ -524,10 +716,15 @@ module.exports = Backbone.View.extend({
 
       var mode = ['file'];
       var markdown = this.model.get('markdown');
+	  var edb = this.model.get('edb');
       var jekyll = /^(_posts|_drafts)/.test(this.model.get('path'));
 
       // Update the navigation view with menu options
       // if a file contains metadata, has default metadata or is Markdown
+	  // 
+	  // Inside the IF-condition, we could explicitly add "|| (edb && jekyll)"
+	  // to test for EDB files with metadata, but this is not really necessary
+	  // as metadata is automatically recognized already.
       if (this.model.get('metadata') || this.model.get('defaults') ||
         (markdown && jekyll)) {
         this.renderMetadata();
@@ -536,6 +733,7 @@ module.exports = Backbone.View.extend({
       }
 
       if (markdown || (jekyll && this.model.get('extension') === 'html')) mode.push('preview');
+	  //if (edb) mode.push('edb-editor');
       if (!this.model.isNew()) mode.push('settings');
 
       this.nav.mode(mode.join(' '));
@@ -560,6 +758,18 @@ module.exports = Backbone.View.extend({
           util.fixedScroll(this.$el.find('.topbar'), 90);
         }
       }
+	  
+	  // Not sure if this is required...
+	  if (this.model.get('edb') && this.mode === 'blob') {
+	    this.blob();
+	  } else {
+		this.$el.find('#edit').toggleClass('active', true);
+        this.$el.find('.file .edit').addClass('active');
+		
+		  if (this.model.get('edb')) {
+          util.fixedScroll(this.$el.find('.topbar'), 90);
+        }
+	  }
 
       if (this.mode === 'blob') {
         this.blob();
@@ -590,6 +800,13 @@ module.exports = Backbone.View.extend({
       this.initEditor();
 
       if (this.model.get('markdown')) {
+        _.delay(function() {
+          util.fixedScroll($('.topbar', view.el), 90);
+        }, 1);
+      }
+	  
+	  // TODO - the same for EDB?
+	  if (this.model.get('edb')) {
         _.delay(function() {
           util.fixedScroll($('.topbar', view.el), 90);
         }, 1);
@@ -1172,8 +1389,24 @@ module.exports = Backbone.View.extend({
       view.modal.render();
     }).bind(this));
 
+//---------------->	
     // Update content
-    this.model.content = (this.editor) ? this.editor.getValue() : '';
+	if (this.model.get('edb')) {
+	  var jsonFormValueObj = $('#jsonform').jsonFormValue(); 
+	  
+	  // Pretty print the json object using indentation of 2 and new lines
+	  var jsonFormValueStr = JSON.stringify(jsonFormValueObj, null, 2);
+	
+      // TODO: Should we check here whether the EDB editor has been initiated?
+	  this.model.set('content', jsonFormValueStr);
+	}
+	else {
+//----------------<
+      this.model.content = (this.editor) ? this.editor.getValue() : '';
+
+//---------------->
+	}
+//----------------<
 
     // Delegate
     method.call(this, {

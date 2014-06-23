@@ -131,6 +131,11 @@ module.exports = {
     return !!(regex.test(path));
   },
 
+  isEdb: function(extension) {
+    var regex = new RegExp("^(edb)$", 'i');
+	return !!(regex.test(extension));
+  },
+
   isMarkdown: function(extension) {
     var regex = new RegExp("^(md|mkdn?|mdown|markdown)$", 'i');
     return !!(regex.test(extension));
